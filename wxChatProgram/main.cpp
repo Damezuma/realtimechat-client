@@ -252,6 +252,7 @@ public:
 						}
 					}
 				}
+				
 				switch (step)
 				{
 				case 0:
@@ -353,6 +354,7 @@ public:
 	{
 
 	}
+
 protected:
 	wxMessageQueue<wxString> m_msgQueue;
 	Dict<wxString, ChannelPage*> m_roomPages;
@@ -485,6 +487,10 @@ public:
 		m_mainFrame->UpdateMemberList(*list);
 		m_mainFrame->ShowSystemMessage(wxString::Format(wxT("[System]%s님이 떠났습니다."), event.GetString()));
 		delete list;
+	}
+	void SendMessage(const Message & msg)
+	{
+
 	}
 	void OnCharTxtCtrl(wxKeyEvent& event)
 	{
