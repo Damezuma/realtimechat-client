@@ -17,5 +17,5 @@ public:
 	void ShowMyMessage(const wxDateTime & time, const wxString & msg);
 	void EventProcedure(Message & message);
 private:
-
+	void OnCharTxtCtrl(wxKeyEvent& event);
 };

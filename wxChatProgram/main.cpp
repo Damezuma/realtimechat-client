@@ -34,10 +34,6 @@ wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 
 template <typename K,typename T>
 using Dict = std::unordered_map<K, T>;
-template <typename T>
-using Refernce = std::shared_ptr<T>;
-template <typename T>
-using WeakReference = std::weak_ptr<T>;
 
 struct ChatMessage
 {
@@ -389,7 +385,7 @@ public:
 		m_mainFrame = new MainFrame();
 		
 		m_mainFrame->Show();
-		this->Connect(ID_TXT_CHAT_MESSAGE_INPUT,wxEVT_CHAR , wxKeyEventHandler(Application::OnCharTxtCtrl), nullptr, this);
+		
 		m_indicator = new wxActivityIndicator(m_mainFrame);
 		m_indicator->Show();
 		m_indicator->Start();
@@ -464,41 +460,25 @@ public:
 		}
 	}
 
-	void SendMessage(const Message & msg)
+	void SendMessage(const wxString & roomName, const wxString & msg)
 	{
+		//TODO:메시지 큐에 넣는 코드 재작성...
+		//이 한 줄은...
+		//m_msgQueue.Post(m_mainFrame->GetMessage());
+		bool needRelive = false;
+		needRelive = m_sendMessageThread->GetThread() != nullptr;
+		if (needRelive == false)
+		{
+			needRelive = m_sendMessageThread->GetThread()->IsAlive() == false;
+		}
 
-	}
-	void OnCharTxtCtrl(wxKeyEvent& event)
-	{
-		if (event.GetKeyCode() == wxKeyCode::WXK_RETURN)
+		if (needRelive)
 		{
-			if (!event.ShiftDown())
-			{
-				m_msgQueue.Post(m_mainFrame->GetMessage());
-				if (m_sendMessageThread->GetThread() != nullptr)
-				{
-					if (m_sendMessageThread->GetThread()->IsAlive() == false)
-					{
-						m_sendMessageThread->CreateThread();
-						m_sendMessageThread->GetThread()->Run();
-					}
-				}
-				else
-				{
-					m_sendMessageThread->CreateThread();
-					m_sendMessageThread->GetThread()->Run();
-				}
-			}
-			else
-			{
-				event.Skip();
-			}
-		}
-		else
-		{
-			event.Skip();
+			m_sendMessageThread->CreateThread();
+			m_sendMessageThread->GetThread()->Run();
 		}
 	}
+	
 private:
 	wxActivityIndicator * m_indicator = nullptr;
 	MainFrame * m_mainFrame = nullptr;

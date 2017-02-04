@@ -2,6 +2,7 @@
 
 ChannelPage::ChannelPage(wxWindow * parent) : MyPanel1(parent)
 {
+	this->Connect(ID_TXT_CHAT_MESSAGE_INPUT, wxEVT_CHAR, wxKeyEventHandler(ChannelPage::OnCharTxtCtrl), nullptr, this);
 }
 wxString ChannelPage::GetMessage()
 {
@@ -48,4 +49,21 @@ void ChannelPage::ShowMyMessage(const wxDateTime & time, const wxString & msg)
 
 void ChannelPage::EventProcedure(Message & message)
 {
+}
+void ChannelPage::OnCharTxtCtrl(wxKeyEvent& event)
+{
+	bool needSkip = false;
+	needSkip = event.GetKeyCode() == wxKeyCode::WXK_RETURN;
+	if (needSkip)
+	{
+		needSkip = event.ShiftDown();
+		if (needSkip == false)
+		{
+			//wxApp::GetInstance()
+		}
+	}
+	else
+	{
+		event.Skip();
+	}
 }
