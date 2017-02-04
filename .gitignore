@@ -1,2 +1,15 @@
 *.tlog
 packages/wxWidgetsTemplate.2.5.3/wxWidgetsTemplate.2.5.3.nupkg
+*.pdb
+wxChatProgram.VC.db
+*.idb
+packages/wxWidgetsTemplate.2.5.3/build/wxWidgetsTemplate.props
+*.xml
+packages/wxWidgetsTemplate.2.5.3/ChangeLog.txt
+packages/wxWidgetsTemplate.2.5.3/README.txt
+*.asm
+*.user
+wxChatProgram/x64/Debug/wxChatProgram.log
+*.suo
+packages/wxWidgetsTemplate.2.5.3/build/wxWidgetsTemplate.targets
+*.obj
