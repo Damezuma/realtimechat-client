@@ -13,3 +13,12 @@ wxChatProgram/x64/Debug/wxChatProgram.log
 *.suo
 packages/wxWidgetsTemplate.2.5.3/build/wxWidgetsTemplate.targets
 *.obj
+*.dll
+*.log
+wxChatProgram/Release/wxChatProgram.pch
+*.pch
+wxChatProgram.VC.VC.opendb
+*.iobj
+Release/wxChatProgram.ipdb
+*.ilk
+*.exe
