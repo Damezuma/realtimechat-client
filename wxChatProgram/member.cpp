@@ -16,7 +16,13 @@ Member::Member(std::string && name, std::string && hashcode)
 	m_hashcode = std::move(hashcode);
 }
 
-bool Member::HaveSameHashcode(const std::string & hashcode) const
+Member::Member(const Member & obj)
+{
+	this->m_hashcode = obj.m_hashcode;
+	this->m_name = obj.m_name;
+}
+
+bool Member::TestSameHashId(const std::string & hashcode) const
 {
 	return m_hashcode == hashcode;
 }

@@ -2,12 +2,15 @@
 #include<wx/wx.h>
 #include"member.h"
 #include<vector>
+#include "utility.hpp"
 enum class MessageType
 {
 	InvalidMessage,
 	ChatMessage,
 	ComeNewMemberInRoom,
-	LeaveMemberFromRoom
+	LeaveMemberFromRoom,
+	ExitServer,
+	DisconnectedServer
 };
 class Message
 {
@@ -19,12 +22,16 @@ public:
 		m_sender =std::move(sender);
 		m_room = std::move(room);
 		m_type = std::move(type);
-		m_time.ParseRfc822Date(time);
+		wxString temp = MakeFromUTF8String(time);
+		temp.Replace("  ", " ");
+		m_time.ParseRfc822Date(temp);
+		
 	}
 	MessageType GetMessageType() { return m_type; }
 	std::string GetSender() { return m_sender; }
 	std::string GetRoom() { return m_room; }
 	wxDateTime GetTime() { return m_time; }
+	bool TestEqualSenderHashId(const std::string & hashId) { return hashId == m_sender; }
 protected:
 	std::string m_sender;
 	std::string m_room;

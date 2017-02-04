@@ -1,8 +1,10 @@
-#include "channelpage.h"
-
-ChannelPage::ChannelPage(wxWindow * parent) : MyPanel1(parent)
+﻿#include "channelpage.h"
+#include "application.h"
+#include "utility.hpp"
+ChannelPage::ChannelPage(wxWindow * parent, std::shared_ptr<Room> room) : MyPanel1(parent)
 {
-	this->Connect(ID_TXT_CHAT_MESSAGE_INPUT, wxEVT_CHAR, wxKeyEventHandler(ChannelPage::OnCharTxtCtrl), nullptr, this);
+	this->m_textCtrl1->Connect(ID_TXT_CHAT_MESSAGE_INPUT, wxEVT_CHAR, wxKeyEventHandler(ChannelPage::OnCharTxtCtrl), nullptr, this);
+	this->m_room = room;
 }
 wxString ChannelPage::GetMessage()
 {
@@ -10,15 +12,14 @@ wxString ChannelPage::GetMessage()
 	m_textCtrl1->Clear();
 	return value;
 }
-void ChannelPage::UpdateMemberList(const std::vector<wxString> & list)
+void ChannelPage::UpdateMemberList()
 {
 	m_listBox1->Clear();
-	wxArrayString arr;
+	auto list = m_room->GetMemberList();
 	for (auto & it : list)
 	{
-		arr.push_back(it);
+		m_listBox1->Append(MakeFromUTF8String(it.GetName()));
 	}
-	m_listBox1->InsertItems(arr, 0);
 }
 void ChannelPage::ShowSystemMessage(const wxString & msg)
 {
@@ -29,26 +30,72 @@ void ChannelPage::ShowSystemMessage(const wxString & msg)
 	m_scrolledWindow1->FitInside();
 	m_scrolledWindow1->GetSizer()->Layout();
 }
-void ChannelPage::ShowMessage(const wxDateTime & time, const wxString & sender, const wxString & msg)
+void ChannelPage::ShowMessage(MessageComeChat & message)
 {
-	MessageBalloon * message = new MessageBalloon(m_scrolledWindow1, wxID_ANY, sender, time, msg);
-	m_scrolledWindow1->GetSizer()->Add(message, 0, wxALIGN_LEFT);
-
-	m_scrolledWindow1->FitInside();
-	m_scrolledWindow1->GetSizer()->Layout();
-}
-void ChannelPage::ShowMyMessage(const wxDateTime & time, const wxString & msg)
-{
-	MyMessageBalloon * myMessage = new MyMessageBalloon(m_scrolledWindow1, wxID_ANY, time, msg);
-	m_scrolledWindow1->GetSizer()->Add(myMessage, 0, wxALIGN_RIGHT);
-
+	auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
+	std::string hashId = app->GetUserHashId();
+	if (message.TestEqualSenderHashId(hashId))
+	{
+		auto balloon = new MyMessageBalloon(m_scrolledWindow1, wxID_ANY, message.GetTime(), MakeFromUTF8String(message.GetText()));
+		m_scrolledWindow1->GetSizer()->Add(balloon, 0, wxALIGN_RIGHT);
+	}
+	else
+	{
+		auto balloon = new MessageBalloon(m_scrolledWindow1, wxID_ANY, m_room->FindUserNameWithHashId(hashId), message.GetTime(), MakeFromUTF8String(message.GetText()));
+		m_scrolledWindow1->GetSizer()->Add(balloon, 0, wxALIGN_LEFT);
+	}
 	m_scrolledWindow1->FitInside();
 	m_scrolledWindow1->GetSizer()->Layout();
 	m_scrolledWindow1->Scroll(0, m_scrolledWindow1->GetSizer()->GetSize().y);
 }
-
+void ChannelPage::ProcedureOnEnterNewUser(MessageAboutRoomEvent & message)
+{
+	m_room->SetMemberList(message.GetMemberList());
+	UpdateMemberList();
+	wxString name = MakeFromUTF8String(m_room->FindUserNameWithHashId(message.GetSender()));
+	ShowSystemMessage(wxString::Format(wxT("%s님이 입장하였습니다."), name));
+}
+void ChannelPage::ProcedureOnLeaveUser(MessageAboutRoomEvent & message)
+{
+	m_room->SetMemberList(message.GetMemberList());
+	UpdateMemberList();
+	wxString name = MakeFromUTF8String(m_room->FindUserNameWithHashId(message.GetSender()));
+	ShowSystemMessage(wxString::Format(wxT("%s님이 나가셨습니다."), name));
+}
+void ChannelPage::ProcedureOnExitOtherUser(MessageAboutRoomEvent & message)
+{
+	wxString name = MakeFromUTF8String(m_room->FindUserNameWithHashId(message.GetSender()));
+	ShowSystemMessage(wxString::Format(wxT("%s님이 프로그램을 종료하였습니다."), name));
+	m_room->SetMemberList(message.GetMemberList());
+	UpdateMemberList();
+}
+void ChannelPage::ProcedureOnOtherUserDisconnectServer(MessageAboutRoomEvent & message)
+{
+	wxString name = MakeFromUTF8String(m_room->FindUserNameWithHashId(message.GetSender()));
+	ShowSystemMessage(wxString::Format(wxT("%s님에게 문제가 발생하여 서버와 연결이 끊겼습니다."), name));
+	m_room->SetMemberList(message.GetMemberList());
+	UpdateMemberList();
+}
 void ChannelPage::EventProcedure(Message & message)
 {
+	switch (message.GetMessageType())
+	{
+	case MessageType::ChatMessage:
+		ShowMessage(dynamic_cast<MessageComeChat&>(message));
+		break;
+	case MessageType::ComeNewMemberInRoom:
+		ProcedureOnEnterNewUser(dynamic_cast<MessageAboutRoomEvent&>(message));
+		break;
+	case MessageType::LeaveMemberFromRoom:
+		ProcedureOnLeaveUser(dynamic_cast<MessageAboutRoomEvent&>(message));
+		break;
+	case MessageType::ExitServer:
+		ProcedureOnExitOtherUser(dynamic_cast<MessageAboutRoomEvent&>(message));
+		break;
+	case MessageType::DisconnectedServer:
+		ProcedureOnOtherUserDisconnectServer(dynamic_cast<MessageAboutRoomEvent&>(message));
+		break;
+	}
 }
 void ChannelPage::OnCharTxtCtrl(wxKeyEvent& event)
 {
@@ -59,7 +106,10 @@ void ChannelPage::OnCharTxtCtrl(wxKeyEvent& event)
 		needSkip = event.ShiftDown();
 		if (needSkip == false)
 		{
-			//wxApp::GetInstance()
+			//TODO:전송하는 코드를 집어넣는다.
+			auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
+			app->ChatMessage(m_room->GetName(), MakeFromWxString(m_textCtrl1->GetValue()));
+			m_textCtrl1->Clear();
 		}
 	}
 	else

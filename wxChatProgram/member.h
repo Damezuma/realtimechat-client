@@ -2,6 +2,7 @@
 #include<vector>
 #include<wx/wx.h>
 #include<string>
+#include<utility>
 class Member
 {
 public:
@@ -9,13 +10,14 @@ public:
 	Member(const std::string & name, const std::string & hashcode);
 	Member(std::string && name, std::string && hashcode);
 	Member(Member&& moveObj) = default;
-	Member& operator = (Member && moveObj)
+	Member(const Member & obj);
+	bool TestSameHashId(const std::string & hashcode) const;
+	Member & operator = (const Member & obj)
 	{
-		this->m_hashcode = std::move(moveObj.GetHashcode);
-		this->m_name = std::move(moveObj.m_name);
+		this->m_hashcode = obj.m_hashcode;
+		this->m_name = obj.m_name;
 		return *this;
 	}
-	bool HaveSameHashcode(const std::string & hashcode) const;
 	std::string GetHashcode() const
 	{
 		return m_hashcode;

@@ -2,12 +2,17 @@
 #include<wx/wx.h>
 #include"member.h"
 #include<vector>
+
 class Room
 {
 public:
 	Room() = default;
-	Room(const wxString & name, const std::vector<Member> & memberList);
+	Room(wxString && name, std::vector<Member> && memberList);
+	std::string GetName() { return m_name; }
+	std::vector<Member> GetMemberList() { return m_memberList; }
+	std::string FindUserNameWithHashId(const std::string& hashId);
+	void SetMemberList(const std::vector<Member> & memberList) { m_memberList = memberList; }
 private:
-	wxString m_name;
+	std::string m_name;
 	std::vector<Member> m_memberList;
 };

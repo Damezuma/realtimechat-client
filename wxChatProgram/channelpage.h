@@ -9,13 +9,17 @@
 class ChannelPage : public MyPanel1
 {
 public:
-	ChannelPage(wxWindow* parent);
+	ChannelPage(wxWindow* parent, std::shared_ptr<Room> room);
 	wxString GetMessage();
-	void UpdateMemberList(const std::vector<wxString> & list);
+	void UpdateMemberList();
 	void ShowSystemMessage(const wxString & msg);
-	void ShowMessage(const wxDateTime & time, const wxString & sender, const wxString & msg);
-	void ShowMyMessage(const wxDateTime & time, const wxString & msg);
+	void ShowMessage(MessageComeChat & message);
+	void ProcedureOnEnterNewUser(MessageAboutRoomEvent & message);
+	void ProcedureOnLeaveUser(MessageAboutRoomEvent & message);
+	void ProcedureOnExitOtherUser(MessageAboutRoomEvent & message);
+	void ProcedureOnOtherUserDisconnectServer(MessageAboutRoomEvent & message);
 	void EventProcedure(Message & message);
 private:
 	void OnCharTxtCtrl(wxKeyEvent& event);
+	std::shared_ptr<Room> m_room;
 };

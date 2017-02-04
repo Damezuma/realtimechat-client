@@ -1,4 +1,5 @@
-﻿#include <wx/wx.h>
+﻿#include "application.h"
+#include <wx/wx.h>
 #include "guidesign.h"
 #include <wx/socket.h>
 #include <wx/protocol/protocol.h>
@@ -14,6 +15,7 @@
 #include <memory>
 #include "message.h"
 #include "channelpage.h"
+#include "utility.hpp"
 const char * SERVER_IP = "localhost";
 
 wxDECLARE_EVENT(wxEVT_COME_MESSAGE, wxThreadEvent);
@@ -31,14 +33,28 @@ wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, wxThreadEvent);
 wxDECLARE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 
+void MainFrame::SendEventMessage(Message & message)
+{
+	auto it = m_roomPages.find(message.GetRoom());
+	if (it != m_roomPages.end())
+	{
+		it->second->EventProcedure(message);
+	}
+}
 
-template <typename K,typename T>
-using Dict = std::unordered_map<K, T>;
+void MainFrame::AddNewChannelPage(std::shared_ptr<Room> room)
+{
+	auto * page = new ChannelPage(m_auinotebook1, room);
+	std::string roomName = room->GetName();
+	m_auinotebook1->AddPage(page, MakeFromUTF8String(roomName));
+	this->m_roomPages.insert(std::make_pair(roomName, page));
+}
+
 
 class SendMessageThread : public wxThreadHelper
 {
 public:
-	SendMessageThread(wxMessageQueue<wxString> * msgQueue,wxString name)
+	SendMessageThread(wxMessageQueue<std::string> * msgQueue,const std::string& name)
 	{
 		m_name = name;
 		m_msgQueue = msgQueue;
@@ -74,7 +90,7 @@ public:
 		nlohmann::json object;
 		if (m_name.length() != 0)
 		{
-			object["name"] =this-> m_name.ToUTF8().data();
+			object["name"] =this-> m_name;
 		}
 		else
 		{
@@ -99,8 +115,10 @@ public:
 			readByteSize = client->Read(readBytes, 1024).LastReadCount();
 			if (readByteSize <= 0)
 			{
+				
 				if (client->Error())
 				{
+					wxSocketError error = client->LastError();
 					return false;
 				}
 			}
@@ -141,38 +159,31 @@ public:
 		{
 
 		}
-		wxString msg;
+		std::string msg;
 		while (m_msgQueue->ReceiveTimeout(1000, msg) == wxMSGQUEUE_NO_ERROR)
 		{
-			nlohmann::json obj;
-			obj["type"] = "TEXT";
-			obj["hash"] = m_hash.ToUTF8().data();
-			obj["room"] = "lounge";
-			obj["value"] = msg.ToUTF8().data();
-
-			std::string data = obj.dump();
-			data.push_back('\n');
+			msg.push_back('\n');
 			long writeSize = 0;
-			while (writeSize != data.length())
+			while (writeSize != msg.length())
 			{
-				writeSize += client->Write(data.c_str() + writeSize, data.length() - writeSize).LastWriteCount();
+				writeSize += client->Write(msg.c_str() + writeSize, msg.length() - writeSize).LastWriteCount();
 			}
 		}
 		return nullptr;
 	}
 private:
-	wxString m_name;
+	std::string m_name;
 	wxSocketClient* client;
-	wxMessageQueue<wxString> * m_msgQueue;
-	wxString m_hash;
+	wxMessageQueue<std::string> * m_msgQueue;
+	std::string m_hash;
 };
 class RecvThread : public wxThread
 {
 
 public:
-	RecvThread(const wxString & hash)
+	RecvThread(const std::string & hash)
 	{
-		m_hash = hash;
+		m_hashId = hash;
 	}
 	virtual void * Entry() override
 	{
@@ -181,7 +192,7 @@ public:
 		ipv4addr.Hostname(SERVER_IP);
 		ipv4addr.Service(2017);
 		
-		std::string sendValue = m_hash.ToStdString();
+		std::string sendValue = m_hashId;
 		if (client->Connect(ipv4addr))
 		{
 			sendValue.append("\n");
@@ -236,7 +247,7 @@ public:
 				switch (step)
 				{
 				case 0:
-					if (m_hash == msg)
+					if (m_hashId == msg)
 					{
 						wxThreadEvent * e = new wxThreadEvent(wxEVT_RECV_TRABSFER_CREATE_SUCCESS);
 						wxApp::GetInstance()->QueueEvent(e);
@@ -252,7 +263,6 @@ public:
 		return nullptr;
 	}
 private:
-	
 	void ParseMessage(const std::string & msg)
 	{
 		Message * message = nullptr;
@@ -273,7 +283,7 @@ private:
 		else if (type == "ENTER_NEW_MEMBER_IN_ROOM")
 		{
 			std::vector<Member> memberlist;	
-			nlohmann::json list = obj["member list"];
+			nlohmann::json list = obj["members"];
 			for (auto & it : list)
 			{
 				std::string name = it.value("name","");
@@ -291,7 +301,7 @@ private:
 		else if (type == "MEMBER_GET_OUT_ROOM")
 		{
 			std::vector<Member> memberlist;
-			nlohmann::json list = obj["member list"];
+			nlohmann::json list = obj["members"];
 			for (auto & it : list)
 			{
 				std::string name = it.value("name", "");
@@ -306,6 +316,42 @@ private:
 				std::move(memberlist)
 			);
 		}
+		else if (type == "EXIT_SERVER")
+		{
+			std::vector<Member> memberlist;
+			nlohmann::json list = obj["members"];
+			for (auto & it : list)
+			{
+				std::string name = it.value("name", "");
+				std::string hash_id = it.value("hash_id", "");
+				memberlist.push_back(Member(std::move(name), std::move(hash_id)));
+			}
+			message = new MessageAboutRoomEvent(
+				MessageType::ExitServer,
+				std::move(room),
+				std::move(sender),
+				time,
+				std::move(memberlist)
+			);
+		}
+		else if (type == "DISCONNECT_USER")
+		{
+			std::vector<Member> memberlist;
+			nlohmann::json list = obj["members"];
+			for (auto & it : list)
+			{
+				std::string name = it.value("name", "");
+				std::string hash_id = it.value("hash_id", "");
+				memberlist.push_back(Member(std::move(name), std::move(hash_id)));
+			}
+			message = new MessageAboutRoomEvent(
+				MessageType::DisconnectedServer,
+				std::move(room),
+				std::move(sender),
+				time,
+				std::move(memberlist)
+			);
+		}
 		if (message != nullptr)
 		{
 			wxThreadEvent * event = new wxThreadEvent(wxEVT_COME_MESSAGE);
@@ -313,160 +359,148 @@ private:
 			wxApp::GetInstance()->QueueEvent(event);
 		}
 	}
-	wxString m_hash;
+	std::string m_hashId;
 };
 
 
 
-class MainFrame : public MyFrame1
+
+bool Application::OnInit()
 {
-public:
-	MainFrame() : MyFrame1(nullptr)
+	if (wxSocketBase::Initialize() == false)
 	{
+		wxMessageBox(wxT("네트워크 연결을 할 수 없습니다. 프로그램을 종료합니다."));
+		return false;
 	}
-	virtual ~MainFrame()
-	{
+	this->Connect(wxEVT_TRABSFER_OPEN_SUCCESS,  (wxEventFunction)&Application::OnOpenSuccess, nullptr, (wxEvtHandler*)this);
+	this->Connect( wxEVT_TRABSFER_OPEN_FAILED,  (wxEventFunction)&Application::OnOpenFailed, nullptr, (wxEvtHandler*)this);
+	this->Connect(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, (wxEventFunction)&Application::OnRecvOpenSuccess, nullptr, (wxEvtHandler*)this);
+	this->Connect(wxEVT_RECV_TRABSFER_CREATE_FAILED, (wxEventFunction)&Application::OnRecvOpenFailed, nullptr, (wxEvtHandler*)this);
+	this->Connect(wxEVT_COME_MESSAGE, (wxEventFunction)&Application::OnComeMessage, nullptr, this);
 
-	}
-	void SendEventMessage(Message & message)
+	auto dialog = new NameInputDialog();
+	if (dialog->ShowModal() == wxID_CLOSE)
 	{
-		auto it = m_roomPages.find(message.GetRoom());
-		if (it != m_roomPages.end())
-		{
-			it->second->EventProcedure(message);
-		}
+		return false;
 	}
-protected:
-	wxMessageQueue<wxString> m_msgQueue;
-	Dict<wxString, ChannelPage*> m_roomPages;
 
-};
-class Application : public wxApp
+
+	m_mainFrame = new MainFrame();
+		
+	m_mainFrame->Show();
+		
+	m_indicator = new wxActivityIndicator(m_mainFrame);
+	m_indicator->Show();
+	m_indicator->Start();
+		
+	m_mainFrame->Enable(false);
+
+	m_mainFrame->Connect(wxEVT_CLOSE_WINDOW, (wxEventFunction)&Application::OnCloseMainFrame, nullptr, this);
+
+	m_sendMessageThread = new SendMessageThread(&m_msgQueue,MakeFromWxString(dialog->GetName()));
+	delete dialog;
+	m_sendMessageThread->CreateThread();
+	m_sendMessageThread->GetThread()->Run();
+
+	return true;
+}
+int Application::OnExit()
 {
-public:
-	virtual bool OnInit() override
+	if (m_sendMessageThread != nullptr)
 	{
-		if (wxSocketBase::Initialize() == false)
+		wxThread * thread = m_sendMessageThread->GetThread();
+		if (thread != nullptr)
 		{
-			wxMessageBox(wxT("네트워크 연결을 할 수 없습니다. 프로그램을 종료합니다."));
-			return false;
+			if (thread->IsAlive())
+			{
+				thread->Delete();
+			}
 		}
-		this->Connect(wxEVT_TRABSFER_OPEN_SUCCESS,  (wxEventFunction)&Application::OnOpenSuccess, nullptr, (wxEvtHandler*)this);
-		this->Connect( wxEVT_TRABSFER_OPEN_FAILED,  (wxEventFunction)&Application::OnOpenFailed, nullptr, (wxEvtHandler*)this);
-		this->Connect(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, (wxEventFunction)&Application::OnRecvOpenSuccess, nullptr, (wxEvtHandler*)this);
-		this->Connect(wxEVT_RECV_TRABSFER_CREATE_FAILED, (wxEventFunction)&Application::OnRecvOpenFailed, nullptr, (wxEvtHandler*)this);
-		this->Connect(wxEVT_COME_MESSAGE, (wxEventFunction)&Application::OnComeMessage, nullptr, this);
+		delete m_sendMessageThread;
+	}	
+	return 0;
+}
 
-		auto dialog = new NameInputDialog();
-		if (dialog->ShowModal() == wxID_CLOSE)
+void Application::OnCloseMainFrame(wxCloseEvent & event)
+{
+	m_mainFrame = nullptr;
+	event.Skip();
+}
+void Application::OnOpenSuccess(wxThreadEvent & event)
+{
+	m_hashId = MakeFromWxString(event.GetString());
+	wxThread * thread = new RecvThread(m_hashId);
+	thread->Run();
+}
+void Application::OnOpenFailed(wxThreadEvent & event)
+{
+	m_indicator->Stop();
+	m_indicator->Destroy();
+	wxMessageBox(wxT("서버와 연결할 수 없습니다."));
+	Exit();
+}
+void Application::OnRecvOpenSuccess(wxThreadEvent & event)
+{
+	m_indicator->Stop();
+	m_indicator->Destroy();
+	m_mainFrame->Enable(true);
+}
+void Application::OnRecvOpenFailed(wxThreadEvent & event)
+{
+	m_indicator->Stop();
+	m_indicator->Destroy();
+	wxMessageBox(wxT("서버와 연결할 수 없습니다."));
+	Exit();
+}
+void Application::OnComeMessage(wxThreadEvent & event)
+{
+	Message * message = nullptr;
+	message = event.GetPayload<Message*>();
+	IHasMemberList * objectHasMemberList = dynamic_cast<IHasMemberList*>(message);
+	if (objectHasMemberList != nullptr)
+	{
+		std::string roomName = message->GetRoom();
+		auto it = m_rooms.find(roomName);
+		if (it == m_rooms.end())
 		{
-			return false;
+			std::shared_ptr<Room> newRoom(new Room(std::move(roomName), objectHasMemberList->GetMemberList()));
+			m_rooms.insert(std::make_pair(message->GetRoom(), newRoom));
+			m_mainFrame->AddNewChannelPage(newRoom);
 		}
+	}
+	m_mainFrame->SendEventMessage(*message);
+	if (message != nullptr)
+	{
+		delete message;
+	}
+}
 
+void Application::ChatMessage(const std::string & roomName, const std::string & msg)
+{
+	//TODO:메시지 큐에 넣는 코드 재작성...
+	//이 한 줄은...
+	
+	nlohmann::json obj;
+	obj["type"] = "TEXT";
+	obj["hash"] = m_hashId;
+	obj["room"] = roomName;
+	obj["value"] = msg;
 
-		m_mainFrame = new MainFrame();
-		
-		m_mainFrame->Show();
-		
-		m_indicator = new wxActivityIndicator(m_mainFrame);
-		m_indicator->Show();
-		m_indicator->Start();
-		
-		m_mainFrame->Enable(false);
+	std::string data = obj.dump();
+	m_msgQueue.Post(data);
 
-		m_mainFrame->Connect(wxEVT_CLOSE_WINDOW, (wxEventFunction)&Application::OnCloseMainFrame, nullptr, this);
+	bool needRelive = false;
+	needRelive = m_sendMessageThread->GetThread() != nullptr;
+	if (needRelive == false)
+	{
+		needRelive = m_sendMessageThread->GetThread()->IsAlive() == false;
+	}
 
-		m_sendMessageThread = new SendMessageThread(&m_msgQueue,dialog->GetName());
-		delete dialog;
+	if (needRelive)
+	{
 		m_sendMessageThread->CreateThread();
 		m_sendMessageThread->GetThread()->Run();
-
-		return true;
 	}
-	virtual int OnExit() override
-	{
-		if (m_sendMessageThread != nullptr)
-		{
-			wxThread * thread = m_sendMessageThread->GetThread();
-			if (thread != nullptr)
-			{
-				if (thread->IsAlive())
-				{
-					thread->Delete();
-				}
-			}
-			delete m_sendMessageThread;
-		}
-		
-		return 0;
-	}
-
-	void OnCloseMainFrame(wxCloseEvent & event)
-	{
-		m_mainFrame = nullptr;
-		event.Skip();
-	}
-	void OnOpenSuccess(wxThreadEvent & event)
-	{
-		wxThread * thread = new RecvThread(event.GetString());
-		thread->Run();
-	}
-	void OnOpenFailed(wxThreadEvent & event)
-	{
-		m_indicator->Stop();
-		m_indicator->Destroy();
-		wxMessageBox(wxT("서버와 연결할 수 없습니다."));
-		Exit();
-	}
-	void OnRecvOpenSuccess(wxThreadEvent & event)
-	{
-		m_indicator->Stop();
-		m_indicator->Destroy();
-		m_mainFrame->Enable(true);
-	}
-	void OnRecvOpenFailed(wxThreadEvent & event)
-	{
-		m_indicator->Stop();
-		m_indicator->Destroy();
-		wxMessageBox(wxT("서버와 연결할 수 없습니다."));
-		Exit();
-	}
-	void OnComeMessage(wxThreadEvent & event)
-	{
-		Message * message = nullptr;
-		message = event.GetPayload<Message*>();
-		m_mainFrame->SendEventMessage(*message);
-		if (message != nullptr)
-		{
-			delete message;
-		}
-	}
-
-	void SendMessage(const wxString & roomName, const wxString & msg)
-	{
-		//TODO:메시지 큐에 넣는 코드 재작성...
-		//이 한 줄은...
-		//m_msgQueue.Post(m_mainFrame->GetMessage());
-		bool needRelive = false;
-		needRelive = m_sendMessageThread->GetThread() != nullptr;
-		if (needRelive == false)
-		{
-			needRelive = m_sendMessageThread->GetThread()->IsAlive() == false;
-		}
-
-		if (needRelive)
-		{
-			m_sendMessageThread->CreateThread();
-			m_sendMessageThread->GetThread()->Run();
-		}
-	}
+}
 	
-private:
-	wxActivityIndicator * m_indicator = nullptr;
-	MainFrame * m_mainFrame = nullptr;
-	wxString m_hash;
-	wxMessageQueue<wxString> m_msgQueue;
-	SendMessageThread * m_sendMessageThread = nullptr;
-};
-
 IMPLEMENT_APP(Application);
