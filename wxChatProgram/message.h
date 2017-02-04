@@ -14,20 +14,20 @@ class Message
 public:
 	Message() = default;
 	virtual ~Message() = default;
-	Message(MessageType type, const wxString & room, const wxString& sender,const wxString & time)
+	Message(MessageType type, std::string && room, std::string&& sender,const std::string& time)
 	{
-		m_sender = sender;
-		m_room = room;
-		m_type = type;
+		m_sender =std::move(sender);
+		m_room = std::move(room);
+		m_type = std::move(type);
 		m_time.ParseRfc822Date(time);
 	}
 	MessageType GetMessageType() { return m_type; }
-	wxString GetSender() { return m_sender; }
-	wxString GetRoom() { return m_room; }
+	std::string GetSender() { return m_sender; }
+	std::string GetRoom() { return m_room; }
 	wxDateTime GetTime() { return m_time; }
 protected:
-	wxString m_sender;
-	wxString m_room;
+	std::string m_sender;
+	std::string m_room;
 	wxDateTime m_time;
 	MessageType m_type;
 };
@@ -43,11 +43,11 @@ class MessageAboutRoomEvent : public IHasMemberList, public Message
 public:
 	MessageAboutRoomEvent(
 		MessageType type,
-		const wxString & room,
-		const wxString& sender,
-		const wxString & time,
+		std::string&& room,
+		std::string&& sender,
+		std::string& time,
 		std::vector<Member> && memberList)
-		:Message(type, room, sender, time),m_memberList(memberList)
+		:Message(type, std::move(room), std::move(sender), time),m_memberList(memberList)
 
 	{
 		
@@ -63,14 +63,15 @@ class MessageComeChat : public Message
 {
 public:
 	MessageComeChat(
-		const wxString & room,
-		const wxString& sender,
-		const wxString & text,
-		const wxString & time)
-		:Message(MessageType::ChatMessage, room, sender, time), m_text(text)
+		std::string&& room,
+		std::string&& sender,
+		std::string&& text,
+		const std::string & time)
+		:Message(MessageType::ChatMessage,std::move(room), std::move(sender),time)
 	{
+		m_text = std::move(text);
 	}
-	wxString GetText() { return m_text; }
+	std::string GetText() { return m_text; }
 private:
-	wxString m_text;
+	std::string m_text;
 };

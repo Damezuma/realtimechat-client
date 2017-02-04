@@ -35,15 +35,6 @@ wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 template <typename K,typename T>
 using Dict = std::unordered_map<K, T>;
 
-struct ChatMessage
-{
-	wxString sender;
-	wxString senderHash;
-	wxString msg;
-	wxString room;
-	wxString text;
-	wxString time;
-};
 class SendMessageThread : public wxThreadHelper
 {
 public:
@@ -261,73 +252,64 @@ public:
 		return nullptr;
 	}
 private:
+	
 	void ParseMessage(const std::string & msg)
 	{
+		Message * message = nullptr;
 		nlohmann::json obj = nlohmann::json::parse(msg.c_str());
 		std::string type = obj.value("type", "");
 		std::string room = obj.value("room", "");
 		std::string sender = obj.value("sender", "");
-		
+		std::string time = obj.value("time", "");
 		if (type == "CHAT_SEND")
 		{
-			ChatMessage * msg = new ChatMessage();
-			std::string temp;
-			temp = obj.value("text", "");
-			msg->text = wxString::FromUTF8(temp.c_str());
-			temp = obj.value("sender", "");
-			msg->sender = wxString::FromUTF8(temp.c_str());
-			temp = obj.value("time", "");
-			msg->time = wxString::FromUTF8(temp.c_str());
-			temp = obj.value("sender hash", "");
-			msg->senderHash = wxString::FromUTF8(temp.c_str());
-			
-			wxThreadEvent * event = nullptr;
-			if (msg->senderHash == m_hash)
-			{
-				event = new wxThreadEvent(wxEVT_RECV_MY_MESSAGE);
-			}
-			else
-			{
-				event = new wxThreadEvent(wxEVT_RECV_MESSAGE);
-			}
-			event->SetPayload<ChatMessage*>(msg);
-
-			wxApp::GetInstance()->QueueEvent(event);
+			std::string text = obj.value("text", "");
+			message = new MessageComeChat(
+				std::move(room),
+				std::move(sender),
+				std::move(text),
+				time);
 		}
 		else if (type == "ENTER_NEW_MEMBER_IN_ROOM")
 		{
-			std::string sender = obj.value("sender", "");
-			std::vector<wxString>* memberlist = new std::vector<wxString>();
-			
+			std::vector<Member> memberlist;	
 			nlohmann::json list = obj["member list"];
 			for (auto & it : list)
 			{
-				std::string name = it;
-				memberlist->push_back(wxString::FromUTF8(name.c_str()));
+				std::string name = it.value("name","");
+				std::string hash_id = it.value("hash_id","");
+				memberlist.push_back(Member(std::move(name),std::move(hash_id)));
 			}
-
-			wxThreadEvent * event = new wxThreadEvent(wxEVT_COME_NEW_MEMEBER);
-			event->SetString(wxString::FromUTF8(sender.c_str()));
-			event->SetPayload<std::vector<wxString>*>(memberlist);
-
-			wxApp::GetInstance()->QueueEvent(event);
+			message = new MessageAboutRoomEvent(
+				MessageType::ComeNewMemberInRoom,
+				std::move(room),
+				std::move(sender),
+				time,
+				std::move(memberlist)
+				);
 		}
 		else if (type == "MEMBER_GET_OUT_ROOM")
 		{
-			std::string newMeber = obj.value("member", "");
-			std::vector<wxString>* memberlist = new std::vector<wxString>();
-
+			std::vector<Member> memberlist;
 			nlohmann::json list = obj["member list"];
 			for (auto & it : list)
 			{
-				std::string name = it;
-				memberlist->push_back(wxString::FromUTF8(name.c_str()));
+				std::string name = it.value("name", "");
+				std::string hash_id = it.value("hash_id", "");
+				memberlist.push_back(Member(std::move(name), std::move(hash_id)));
 			}
-
-			wxThreadEvent * event = new wxThreadEvent(wxEVT_LEAVE_MEMEBER);
-			event->SetString(wxString::FromUTF8(newMeber.c_str()));
-			event->SetPayload<std::vector<wxString>*>(memberlist);
-
+			message = new MessageAboutRoomEvent(
+				MessageType::LeaveMemberFromRoom,
+				std::move(room),
+				std::move(sender),
+				time,
+				std::move(memberlist)
+			);
+		}
+		if (message != nullptr)
+		{
+			wxThreadEvent * event = new wxThreadEvent(wxEVT_COME_MESSAGE);
+			event->SetPayload<Message*>(message);
 			wxApp::GetInstance()->QueueEvent(event);
 		}
 	}
