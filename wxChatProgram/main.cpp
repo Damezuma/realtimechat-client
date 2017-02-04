@@ -12,20 +12,12 @@
 #include "member.h"
 #include <unordered_map>
 #include <memory>
+#include "message.h"
 #include "channelpage.h"
 const char * SERVER_IP = "localhost";
 
-wxDECLARE_EVENT(wxEVT_RECV_MESSAGE, wxThreadEvent);
-wxDEFINE_EVENT(wxEVT_RECV_MESSAGE, wxThreadEvent);
-
-wxDECLARE_EVENT(wxEVT_RECV_MY_MESSAGE, wxThreadEvent);
-wxDEFINE_EVENT(wxEVT_RECV_MY_MESSAGE, wxThreadEvent);
-
-wxDECLARE_EVENT(wxEVT_COME_NEW_MEMEBER, wxThreadEvent);
-wxDEFINE_EVENT(wxEVT_COME_NEW_MEMEBER, wxThreadEvent);
-
-wxDECLARE_EVENT(wxEVT_LEAVE_MEMEBER, wxThreadEvent);
-wxDEFINE_EVENT(wxEVT_LEAVE_MEMEBER, wxThreadEvent);
+wxDECLARE_EVENT(wxEVT_COME_MESSAGE, wxThreadEvent);
+wxDEFINE_EVENT(wxEVT_COME_MESSAGE, wxThreadEvent);
 
 wxDECLARE_EVENT(wxEVT_TRABSFER_OPEN_SUCCESS, wxThreadEvent);
 wxDEFINE_EVENT(wxEVT_TRABSFER_OPEN_SUCCESS, wxThreadEvent);
@@ -38,6 +30,7 @@ wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, wxThreadEvent);
 
 wxDECLARE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
+
 
 template <typename K,typename T>
 using Dict = std::unordered_map<K, T>;
@@ -276,6 +269,9 @@ private:
 	{
 		nlohmann::json obj = nlohmann::json::parse(msg.c_str());
 		std::string type = obj.value("type", "");
+		std::string room = obj.value("room", "");
+		std::string sender = obj.value("sender", "");
+		
 		if (type == "CHAT_SEND")
 		{
 			ChatMessage * msg = new ChatMessage();
@@ -354,7 +350,14 @@ public:
 	{
 
 	}
-
+	void SendEventMessage(Message & message)
+	{
+		auto it = m_roomPages.find(message.GetRoom());
+		if (it != m_roomPages.end())
+		{
+			it->second->EventProcedure(message);
+		}
+	}
 protected:
 	wxMessageQueue<wxString> m_msgQueue;
 	Dict<wxString, ChannelPage*> m_roomPages;
@@ -374,10 +377,7 @@ public:
 		this->Connect( wxEVT_TRABSFER_OPEN_FAILED,  (wxEventFunction)&Application::OnOpenFailed, nullptr, (wxEvtHandler*)this);
 		this->Connect(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, (wxEventFunction)&Application::OnRecvOpenSuccess, nullptr, (wxEvtHandler*)this);
 		this->Connect(wxEVT_RECV_TRABSFER_CREATE_FAILED, (wxEventFunction)&Application::OnRecvOpenFailed, nullptr, (wxEvtHandler*)this);
-		this->Connect(wxEVT_LEAVE_MEMEBER, (wxEventFunction)&Application::OnLeaveMember, nullptr, this);
-		this->Connect(wxEVT_COME_NEW_MEMEBER, (wxEventFunction)&Application::OnComeNewMember, nullptr, this);
-		this->Connect(wxEVT_RECV_MESSAGE, (wxEventFunction)&Application::OnRecvMessage, nullptr, this);
-		this->Connect(wxEVT_RECV_MY_MESSAGE, (wxEventFunction)&Application::OnRecvMyMessage, nullptr, this);
+		this->Connect(wxEVT_COME_MESSAGE, (wxEventFunction)&Application::OnComeMessage, nullptr, this);
 
 		auto dialog = new NameInputDialog();
 		if (dialog->ShowModal() == wxID_CLOSE)
@@ -422,28 +422,7 @@ public:
 		
 		return 0;
 	}
-	void OnRecvMessage(wxThreadEvent & event)
-	{
-		if (m_mainFrame != nullptr)
-		{
-			ChatMessage * msg = event.GetPayload<ChatMessage*>();
-			wxDateTime dt;
-			dt.ParseRfc822Date(msg->time);
-			m_mainFrame->ShowMessage(dt, msg->sender, msg->text);
-			delete msg;
-		}
-	}
-	void OnRecvMyMessage(wxThreadEvent & event)
-	{
-		if (m_mainFrame != nullptr)
-		{
-			ChatMessage * msg = event.GetPayload<ChatMessage*>();
-			wxDateTime dt;
-			dt.ParseRfc822Date(msg->time);
-			m_mainFrame->ShowMyMessage(dt, msg->text);
-			delete msg;
-		}
-	}
+
 	void OnCloseMainFrame(wxCloseEvent & event)
 	{
 		m_mainFrame = nullptr;
@@ -474,20 +453,17 @@ public:
 		wxMessageBox(wxT("서버와 연결할 수 없습니다."));
 		Exit();
 	}
-	void OnComeNewMember(wxThreadEvent & event)
+	void OnComeMessage(wxThreadEvent & event)
 	{
-		std::vector<wxString> * list = event.GetPayload<std::vector<wxString>*>();
-		m_mainFrame->UpdateMemberList(*list);
-		m_mainFrame->ShowSystemMessage(wxString::Format(wxT("[System]%s님이 입장하였습니다."), event.GetString()));
-		delete list;
+		Message * message = nullptr;
+		message = event.GetPayload<Message*>();
+		m_mainFrame->SendEventMessage(*message);
+		if (message != nullptr)
+		{
+			delete message;
+		}
 	}
-	void OnLeaveMember(wxThreadEvent & event)
-	{
-		std::vector<wxString> * list = event.GetPayload<std::vector<wxString>*>();
-		m_mainFrame->UpdateMemberList(*list);
-		m_mainFrame->ShowSystemMessage(wxString::Format(wxT("[System]%s님이 떠났습니다."), event.GetString()));
-		delete list;
-	}
+
 	void SendMessage(const Message & msg)
 	{
 

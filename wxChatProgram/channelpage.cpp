@@ -45,3 +45,7 @@ void ChannelPage::ShowMyMessage(const wxDateTime & time, const wxString & msg)
 	m_scrolledWindow1->GetSizer()->Layout();
 	m_scrolledWindow1->Scroll(0, m_scrolledWindow1->GetSizer()->GetSize().y);
 }
+
+void ChannelPage::EventProcedure(Message & message)
+{
+}
