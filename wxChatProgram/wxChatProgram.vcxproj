@@ -143,19 +143,26 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="channelpage.cpp" />
     <ClCompile Include="guidesign.cpp" />
     <ClCompile Include="inputnamedialog.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="member.cpp" />
     <ClCompile Include="messageballoon.cpp" />
+    <ClCompile Include="room.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="channelpage.h" />
     <ClInclude Include="guidesign.h" />
     <ClInclude Include="inputnamedialog.h" />
     <ClInclude Include="json.hpp" />
+    <ClInclude Include="member.h" />
+    <ClInclude Include="message.h" />
     <ClInclude Include="messageballoon.h" />
+    <ClInclude Include="room.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
