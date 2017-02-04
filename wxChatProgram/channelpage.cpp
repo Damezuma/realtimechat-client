@@ -6,6 +6,11 @@ ChannelPage::ChannelPage(wxWindow * parent, std::shared_ptr<Room> room) : MyPane
 	this->m_textCtrl1->Connect(ID_TXT_CHAT_MESSAGE_INPUT, wxEVT_CHAR, wxKeyEventHandler(ChannelPage::OnCharTxtCtrl), nullptr, this);
 	this->m_room = room;
 }
+ChannelPage::~ChannelPage()
+{
+	auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
+	app->LeaveRoom(m_room->GetName());
+}
 wxString ChannelPage::GetMessage()
 {
 	wxString value = m_textCtrl1->GetValue();

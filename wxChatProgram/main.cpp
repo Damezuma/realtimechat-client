@@ -50,6 +50,13 @@ void MainFrame::AddNewChannelPage(std::shared_ptr<Room> room)
 	this->m_roomPages.insert(std::make_pair(roomName, page));
 }
 
+void MainFrame::OnClickNewRoom(wxCommandEvent & event)
+{
+	std::string roomName = MakeFromWxString( m_textCtrl3->GetValue());
+	auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
+	app->EnterRoom(roomName);
+}
+
 
 class SendMessageThread : public wxThreadHelper
 {
@@ -485,6 +492,57 @@ void Application::ChatMessage(const std::string & roomName, const std::string & 
 	obj["hash"] = m_hashId;
 	obj["room"] = roomName;
 	obj["value"] = msg;
+
+	std::string data = obj.dump();
+	m_msgQueue.Post(data);
+
+	bool needRelive = false;
+	needRelive = m_sendMessageThread->GetThread() != nullptr;
+	if (needRelive == false)
+	{
+		needRelive = m_sendMessageThread->GetThread()->IsAlive() == false;
+	}
+
+	if (needRelive)
+	{
+		m_sendMessageThread->CreateThread();
+		m_sendMessageThread->GetThread()->Run();
+	}
+}
+
+void Application::EnterRoom(const std::string & roomName)
+{
+	nlohmann::json obj;
+	obj["type"] = "ENTER";
+	obj["hash"] = m_hashId;
+	obj["room"] = roomName;
+	obj["value"] = "";
+
+	std::string data = obj.dump();
+	m_msgQueue.Post(data);
+
+	bool needRelive = false;
+	needRelive = m_sendMessageThread->GetThread() != nullptr;
+	if (needRelive == false)
+	{
+		needRelive = m_sendMessageThread->GetThread()->IsAlive() == false;
+	}
+
+	if (needRelive)
+	{
+		m_sendMessageThread->CreateThread();
+		m_sendMessageThread->GetThread()->Run();
+	}
+}
+
+void Application::LeaveRoom(const std::string & roomName)
+{
+	m_rooms.erase(roomName);
+	nlohmann::json obj;
+	obj["type"] = "LEAVE";
+	obj["hash"] = m_hashId;
+	obj["room"] = roomName;
+	obj["value"] = "";
 
 	std::string data = obj.dump();
 	m_msgQueue.Post(data);

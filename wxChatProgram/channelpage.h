@@ -10,6 +10,7 @@ class ChannelPage : public MyPanel1
 {
 public:
 	ChannelPage(wxWindow* parent, std::shared_ptr<Room> room);
+	~ChannelPage();
 	wxString GetMessage();
 	void UpdateMemberList();
 	void ShowSystemMessage(const wxString & msg);

@@ -22,6 +22,7 @@ public:
 	void SendEventMessage(Message & message);
 	void AddNewChannelPage(std::shared_ptr<Room> room);
 protected:
+	void OnClickNewRoom(wxCommandEvent & event) override;
 	wxMessageQueue<std::string> m_msgQueue;
 	Dict<std::string, ChannelPage*> m_roomPages;
 
@@ -39,6 +40,8 @@ public:
 	void OnRecvOpenFailed(wxThreadEvent & event);
 	void OnComeMessage(wxThreadEvent & event);
 	void ChatMessage(const std::string & roomName, const std::string & msg);
+	void EnterRoom(const std::string & roomName);
+	void LeaveRoom(const std::string & roomName);
 	std::string GetUserHashId() { return m_hashId; }
 private:
 	Dict<std::string, std::shared_ptr<Room>> m_rooms;

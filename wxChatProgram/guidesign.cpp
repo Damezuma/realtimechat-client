@@ -16,6 +16,22 @@ MyFrame1::MyFrame1( wxWindow* parent, wxWindowID id, const wxString& title, cons
 	wxBoxSizer* bSizer7;
 	bSizer7 = new wxBoxSizer( wxVERTICAL );
 	
+	wxBoxSizer* bSizer71;
+	bSizer71 = new wxBoxSizer( wxHORIZONTAL );
+	
+	m_staticText2 = new wxStaticText( this, wxID_ANY, wxT("채널 명"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_staticText2->Wrap( -1 );
+	bSizer71->Add( m_staticText2, 0, wxALL|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_textCtrl3 = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0 );
+	bSizer71->Add( m_textCtrl3, 0, wxALL|wxALIGN_CENTER_VERTICAL, 5 );
+	
+	m_button2 = new wxButton( this, wxID_ANY, wxT("들어가기"), wxDefaultPosition, wxDefaultSize, 0 );
+	bSizer71->Add( m_button2, 0, wxALL, 5 );
+	
+	
+	bSizer7->Add( bSizer71, 0, 0, 5 );
+	
 	m_auinotebook1 = new wxAuiNotebook( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxAUI_NB_DEFAULT_STYLE );
 	
 	bSizer7->Add( m_auinotebook1, 1, wxEXPAND, 5 );
@@ -25,10 +41,16 @@ MyFrame1::MyFrame1( wxWindow* parent, wxWindowID id, const wxString& title, cons
 	this->Layout();
 	
 	this->Centre( wxBOTH );
+	
+	// Connect Events
+	m_button2->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( MyFrame1::OnClickNewRoom ), NULL, this );
 }
 
 MyFrame1::~MyFrame1()
 {
+	// Disconnect Events
+	m_button2->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( MyFrame1::OnClickNewRoom ), NULL, this );
+	
 }
 
 MyPanel1::MyPanel1( wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style ) : wxPanel( parent, id, pos, size, style )

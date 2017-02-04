@@ -7,7 +7,7 @@ class Room
 {
 public:
 	Room() = default;
-	Room(wxString && name, std::vector<Member> && memberList);
+	Room(std::string && name, std::vector<Member> && memberList);
 	std::string GetName() { return m_name; }
 	std::vector<Member> GetMemberList() { return m_memberList; }
 	std::string FindUserNameWithHashId(const std::string& hashId);

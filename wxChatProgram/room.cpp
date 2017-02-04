@@ -1,6 +1,6 @@
 #include "room.h"
 
-Room::Room(wxString && name, std::vector<Member> && memberList)
+Room::Room(std::string && name, std::vector<Member> && memberList)
 {
 	m_name =std::move(name);
 	m_memberList = std::move(memberList);
