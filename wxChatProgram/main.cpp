@@ -9,6 +9,10 @@
 #include <wx/datetime.h>
 #include "messageballoon.h"
 #include "inputnamedialog.h"
+#include "member.h"
+#include <unordered_map>
+#include <memory>
+#include "channelpage.h"
 const char * SERVER_IP = "localhost";
 
 wxDECLARE_EVENT(wxEVT_RECV_MESSAGE, wxThreadEvent);
@@ -35,7 +39,12 @@ wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, wxThreadEvent);
 wxDECLARE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 
-
+template <typename K,typename T>
+using Dict = std::unordered_map<K, T>;
+template <typename T>
+using Refernce = std::shared_ptr<T>;
+template <typename T>
+using WeakReference = std::weak_ptr<T>;
 
 struct ChatMessage
 {
@@ -121,14 +130,13 @@ public:
 				{
 					isEndMsg = true;
 				}
-				else switch (isEndMsg)
+				else if (isEndMsg == false)
 				{
-				case false:
 					s.push_back(readBytes[i]);
-					break;
-				case true:
+				}
+				else
+				{
 					buffer.push_back(readBytes[i]);
-					break;
 				}
 			}
 		}
@@ -234,14 +242,13 @@ public:
 						{
 							isEndMsg = true;
 						}
-						else switch (isEndMsg)
+						else if (isEndMsg)
 						{
-						case false:
-							msg.push_back(readBytes[i]);
-							break;
-						case true:
 							buffer.push_back(readBytes[i]);
-							break;
+						}
+						else
+						{
+							msg.push_back(readBytes[i]);
 						}
 					}
 				}
@@ -294,9 +301,9 @@ private:
 
 			wxApp::GetInstance()->QueueEvent(event);
 		}
-		else if (type == "NEW_MEMBER_COME_IN")
+		else if (type == "ENTER_NEW_MEMBER_IN_ROOM")
 		{
-			std::string newMeber = obj.value("new member", "");
+			std::string sender = obj.value("sender", "");
 			std::vector<wxString>* memberlist = new std::vector<wxString>();
 			
 			nlohmann::json list = obj["member list"];
@@ -307,7 +314,7 @@ private:
 			}
 
 			wxThreadEvent * event = new wxThreadEvent(wxEVT_COME_NEW_MEMEBER);
-			event->SetString(wxString::FromUTF8(newMeber.c_str()));
+			event->SetString(wxString::FromUTF8(sender.c_str()));
 			event->SetPayload<std::vector<wxString>*>(memberlist);
 
 			wxApp::GetInstance()->QueueEvent(event);
@@ -346,51 +353,10 @@ public:
 	{
 
 	}
-	wxString GetMessage()
-	{
-		wxString value = m_textCtrl1->GetValue();
-		m_textCtrl1->Clear();
-		return value;
-	}
-	void UpdateMemberList(const std::vector<wxString> & list)
-	{
-		m_listBox1->Clear();
-		wxArrayString arr;
-		for (auto & it : list)
-		{
-			arr.push_back(it);
-		}
-		m_listBox1->InsertItems(arr,0);
-	}
-	void ShowSystemMessage(const wxString & msg)
-	{
-		//this->m_listBox2->AppendString(msg);
-		SystemMessageBalloon * message = new SystemMessageBalloon(m_scrolledWindow1, wxID_ANY,  msg);
-		m_scrolledWindow1->GetSizer()->Add(message, 0, wxALIGN_CENTER);
-
-		m_scrolledWindow1->FitInside();
-		m_scrolledWindow1->GetSizer()->Layout();
-	}
-	void ShowMessage(const wxDateTime & time, const wxString & sender, const wxString & msg)
-	{
-		MessageBalloon * message = new MessageBalloon(m_scrolledWindow1, wxID_ANY,sender,time,msg);
-		m_scrolledWindow1->GetSizer()->Add(message, 0, wxALIGN_LEFT);
-		
-		m_scrolledWindow1->FitInside();
-		m_scrolledWindow1->GetSizer()->Layout();
-	}
-	void ShowMyMessage(const wxDateTime & time, const wxString & msg)
-	{
-		MyMessageBalloon * myMessage = new MyMessageBalloon(m_scrolledWindow1, wxID_ANY,time, msg);
-		m_scrolledWindow1->GetSizer()->Add(myMessage, 0, wxALIGN_RIGHT);
-		
-		m_scrolledWindow1->FitInside();
-		m_scrolledWindow1->GetSizer()->Layout();
-		m_scrolledWindow1->Scroll(0, m_scrolledWindow1->GetSizer()->GetSize().y);
-	}
 protected:
 	wxMessageQueue<wxString> m_msgQueue;
-	
+	Dict<wxString, ChannelPage*> m_roomPages;
+
 };
 class Application : public wxApp
 {
