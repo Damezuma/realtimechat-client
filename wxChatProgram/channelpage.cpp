@@ -100,20 +100,16 @@ void ChannelPage::EventProcedure(Message & message)
 void ChannelPage::OnCharTxtCtrl(wxKeyEvent& event)
 {
 	bool needSkip = false;
-	needSkip = event.GetKeyCode() == wxKeyCode::WXK_RETURN;
+	needSkip = (event.GetKeyCode() != wxKeyCode::WXK_RETURN) || (event.GetKeyCode() == wxKeyCode::WXK_RETURN && event.ShiftDown());
+	
 	if (needSkip)
 	{
-		needSkip = event.ShiftDown();
-		if (needSkip == false)
-		{
-			//TODO:전송하는 코드를 집어넣는다.
-			auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
-			app->ChatMessage(m_room->GetName(), MakeFromWxString(m_textCtrl1->GetValue()));
-			m_textCtrl1->Clear();
-		}
+		event.Skip();
 	}
 	else
 	{
-		event.Skip();
+		auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
+		app->ChatMessage(m_room->GetName(), MakeFromWxString(m_textCtrl1->GetValue()));
+		m_textCtrl1->Clear();
 	}
 }
