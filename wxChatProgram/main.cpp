@@ -13,10 +13,11 @@
 #include "member.h"
 #include <unordered_map>
 #include <memory>
+#include <queue>
 #include "message.h"
 #include "channelpage.h"
 #include "utility.hpp"
-const char * SERVER_IP = "localhost";
+const char * SERVER_IP = "locahost";
 
 wxDECLARE_EVENT(wxEVT_COME_MESSAGE, wxThreadEvent);
 wxDEFINE_EVENT(wxEVT_COME_MESSAGE, wxThreadEvent);
@@ -76,7 +77,7 @@ void MainFrame::RemoveChannelPage(const std::string &  roomName)
 class SendMessageThread : public wxThreadHelper
 {
 public:
-	SendMessageThread(wxMessageQueue<std::string> * msgQueue,const std::string& userHashId)
+	SendMessageThread(wxMessageQueue<std::string*> * msgQueue,const std::string& userHashId)
 	{
 		m_userHashId = userHashId;
 		m_msgQueue = msgQueue;
@@ -182,14 +183,14 @@ public:
 		{
 
 		}
-		std::string msg;
-		while (m_msgQueue->ReceiveTimeout(1000, msg) == wxMSGQUEUE_NO_ERROR)
+		std::string* msg;
+		while (m_msgQueue->ReceiveTimeout(10, msg) == wxMSGQUEUE_NO_ERROR)
 		{
-			msg.push_back('\n');
+			msg->push_back('\n');
 			long writeSize = 0;
-			while (writeSize != msg.length())
+			while (writeSize != msg->length())
 			{
-				long lastWriteCount = m_client->Write(msg.c_str() + writeSize, msg.length() - writeSize).LastWriteCount();
+				long lastWriteCount = m_client->Write(msg->c_str() + writeSize, msg->length() - writeSize).LastWriteCount();
 				if (lastWriteCount == 0 && m_client->IsClosed())
 				{
 					m_client->Destroy();
@@ -198,13 +199,14 @@ public:
 				}
 				writeSize += lastWriteCount;
 			}
+			delete msg;
 		}
 		return nullptr;
 	}
 private:
 	std::string m_userHashId;
 	wxSocketClient* m_client;
-	wxMessageQueue<std::string> * m_msgQueue;
+	wxMessageQueue<std::string*> * m_msgQueue;
 	std::string m_hash;
 };
 class RecvThread : public wxThread
@@ -232,61 +234,55 @@ public:
 				writeSize += client->Write(sendValue.c_str() + writeSize, sendValue.length() - writeSize).LastWriteCount();
 			}
 
-			std::vector<unsigned char> buffer;
+			std::queue<unsigned char> queue;
 			int step = 0;
 			while (true)
 			{
 				long readByteSize = 0;
-				unsigned char readBytes[1024] = { 0 };
-
-				bool isEndMsg = false;
+				unsigned char buffer[1024] = { 0 };
+				//우선 소켓에서 읽는다.
+				readByteSize = client->Read(buffer, 1024).LastReadCount();
+				if (readByteSize <= 0)
+				{
+					if (client->Error())
+					{
+						client->Destroy();
+						return nullptr;
+					}
+				}
+				//읽는 데이터를 큐에 넣는다.
+				for (long i = 0; i < readByteSize; i++)
+				{
+					queue.push(buffer[i]);
+				}
+				//읽은 큐에서 빌 때까지 하나씩 꺼내며 \n이 있는지 확인한다.
 				std::string msg;
-				for (unsigned char ch : buffer)
+				while (queue.empty() == false)
 				{
+					char ch = queue.front();
 					msg.push_back(ch);
+					queue.pop();
+					//꺼낸 게 \n이면 메시지의 끝이니 파싱한다.
+					if (ch == '\n')
+					{
+						msg.pop_back();
+						if (step == 1)
+						{	
+							ParseMessage(msg);
+						}
+						else if (step == 0 && m_hashId == msg)
+						{
+							wxThreadEvent * e = new wxThreadEvent(wxEVT_RECV_TRABSFER_CREATE_SUCCESS);
+							wxApp::GetInstance()->QueueEvent(e);
+							step++;
+						}
+						//메시지의 파싱이 끝나면 msg를 비운다.
+						msg.clear();
+					}	
 				}
-				buffer.clear();
-				while (isEndMsg == false)
+				for (char & ch : msg)
 				{
-					readByteSize = client->Read(readBytes, 1024).LastReadCount();
-					if (readByteSize <= 0)
-					{
-						if (client->Error())
-						{
-							client->Destroy();
-							return nullptr;
-						}
-					}
-					for (long i = 0; i < readByteSize; i++)
-					{
-						if (readBytes[i] == '\n' && isEndMsg == false)
-						{
-							isEndMsg = true;
-						}
-						else if (isEndMsg)
-						{
-							buffer.push_back(readBytes[i]);
-						}
-						else
-						{
-							msg.push_back(readBytes[i]);
-						}
-					}
-				}
-				
-				switch (step)
-				{
-				case 0:
-					if (m_hashId == msg)
-					{
-						wxThreadEvent * e = new wxThreadEvent(wxEVT_RECV_TRABSFER_CREATE_SUCCESS);
-						wxApp::GetInstance()->QueueEvent(e);
-					}
-					step++;
-					break;
-				case 1:
-					ParseMessage(msg);
-					break;
+					queue.push(ch);
 				}
 			}
 		}
@@ -517,7 +513,7 @@ void Application::ChatMessage(const std::string & roomName, const std::string & 
 	obj["room"] = roomName;
 	obj["value"] = msg;
 
-	std::string data = obj.dump();
+	std::string* data = new std::string(std::move(obj.dump()));
 	m_msgQueue.Post(data);
 
 	bool needRelive = false;
@@ -542,7 +538,7 @@ void Application::EnterRoom(const std::string & roomName)
 	obj["room"] = roomName;
 	obj["value"] = "";
 
-	std::string data = obj.dump();
+	std::string* data = new std::string(std::move(obj.dump()));
 	m_msgQueue.Post(data);
 
 	bool needRelive = false;
@@ -568,7 +564,7 @@ void Application::LeaveRoom(const std::string & roomName)
 	obj["room"] = roomName;
 	obj["value"] = "";
 
-	std::string data = obj.dump();
+	std::string* data = new std::string(std::move(obj.dump()));
 	m_msgQueue.Post(data);
 
 	bool needRelive = false;

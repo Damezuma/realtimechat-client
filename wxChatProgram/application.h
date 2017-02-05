@@ -49,6 +49,6 @@ private:
 	wxActivityIndicator * m_indicator = nullptr;
 	MainFrame * m_mainFrame = nullptr;
 	std::string m_hashId;
-	wxMessageQueue<std::string> m_msgQueue;
+	wxMessageQueue<std::string*> m_msgQueue;
 	SendMessageThread * m_sendMessageThread = nullptr;
 };
