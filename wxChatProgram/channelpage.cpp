@@ -62,10 +62,11 @@ void ChannelPage::ProcedureOnEnterNewUser(MessageAboutRoomEvent & message)
 }
 void ChannelPage::ProcedureOnLeaveUser(MessageAboutRoomEvent & message)
 {
-	m_room->SetMemberList(message.GetMemberList());
-	UpdateMemberList();
+	
 	wxString name = MakeFromUTF8String(m_room->FindUserNameWithHashId(message.GetSender()));
 	ShowSystemMessage(wxString::Format(wxT("%s님이 나가셨습니다."), name));
+	m_room->SetMemberList(message.GetMemberList());
+	UpdateMemberList();
 }
 void ChannelPage::ProcedureOnExitOtherUser(MessageAboutRoomEvent & message)
 {

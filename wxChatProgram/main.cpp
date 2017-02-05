@@ -61,9 +61,9 @@ void MainFrame::OnClickNewRoom(wxCommandEvent & event)
 class SendMessageThread : public wxThreadHelper
 {
 public:
-	SendMessageThread(wxMessageQueue<std::string> * msgQueue,const std::string& name)
+	SendMessageThread(wxMessageQueue<std::string> * msgQueue,const std::string& userHashId)
 	{
-		m_name = name;
+		m_userHashId = userHashId;
 		m_msgQueue = msgQueue;
 		m_client = nullptr;
 	}
@@ -72,6 +72,7 @@ public:
 		if (m_client != nullptr)
 		{
 			char ss[] = "{\"type\":\"EXIT\",\"value\":\"\",\"room\":\"\"}\n";
+
 			m_client->Write(ss, 38);
 			m_client->Close();
 			delete m_client;
@@ -95,9 +96,9 @@ public:
 			return false;
 		}
 		nlohmann::json object;
-		if (m_name.length() != 0)
+		if (m_userHashId.length() != 0)
 		{
-			object["name"] =this-> m_name;
+			object["name"] =this-> m_userHashId;
 		}
 		else
 		{
@@ -186,7 +187,7 @@ public:
 		return nullptr;
 	}
 private:
-	std::string m_name;
+	std::string m_userHashId;
 	wxSocketClient* m_client;
 	wxMessageQueue<std::string> * m_msgQueue;
 	std::string m_hash;
@@ -312,7 +313,7 @@ private:
 				std::move(memberlist)
 				);
 		}
-		else if (type == "MEMBER_GET_OUT_ROOM")
+		else if (type == "EXIT_MEMBER_FROM_ROOM")
 		{
 			std::vector<Member> memberlist;
 			nlohmann::json list = obj["members"];
