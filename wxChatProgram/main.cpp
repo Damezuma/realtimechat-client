@@ -33,21 +33,31 @@ wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_SUCCESS, wxThreadEvent);
 wxDECLARE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 wxDEFINE_EVENT(wxEVT_RECV_TRABSFER_CREATE_FAILED, wxThreadEvent);
 
+MainFrame::MainFrame() : MyFrame1(nullptr)
+{
+}
+
 void MainFrame::SendEventMessage(Message & message)
 {
 	auto it = m_roomPages.find(message.GetRoom());
 	if (it != m_roomPages.end())
 	{
-		it->second->EventProcedure(message);
+		if (it->second != nullptr)
+		{
+			it->second->EventProcedure(message);
+		}
 	}
 }
 
 void MainFrame::AddNewChannelPage(std::shared_ptr<Room> room)
 {
-	auto * page = new ChannelPage(m_auinotebook1, room);
-	std::string roomName = room->GetName();
-	m_auinotebook1->AddPage(page, MakeFromUTF8String(roomName));
-	this->m_roomPages.insert(std::make_pair(roomName, page));
+	if (room != nullptr)
+	{
+		auto * page = new ChannelPage(m_auinotebook1, room);
+		std::string roomName = room->GetName();
+		m_auinotebook1->AddPage(page, MakeFromUTF8String(roomName));
+		this->m_roomPages.insert(std::make_pair(roomName, page));
+	}
 }
 
 void MainFrame::OnClickNewRoom(wxCommandEvent & event)
@@ -55,6 +65,11 @@ void MainFrame::OnClickNewRoom(wxCommandEvent & event)
 	std::string roomName = MakeFromWxString( m_textCtrl3->GetValue());
 	auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
 	app->EnterRoom(roomName);
+}
+
+void MainFrame::RemoveChannelPage(const std::string &  roomName)
+{
+	this->m_roomPages.erase(roomName);
 }
 
 

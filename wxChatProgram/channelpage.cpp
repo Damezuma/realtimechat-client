@@ -10,6 +10,11 @@ ChannelPage::~ChannelPage()
 {
 	auto * app = dynamic_cast<Application*>(wxApp::GetInstance());
 	app->LeaveRoom(m_room->GetName());
+	auto * mainframe  = dynamic_cast<MainFrame*>(this->GetGrandParent());
+	if (mainframe != nullptr)
+	{
+		mainframe->RemoveChannelPage(this->m_room->GetName());
+	}
 }
 wxString ChannelPage::GetMessage()
 {

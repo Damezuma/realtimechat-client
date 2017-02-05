@@ -12,19 +12,20 @@ class SendMessageThread;
 class MainFrame : public MyFrame1
 {
 public:
-	MainFrame() : MyFrame1(nullptr)
-	{
-	}
+	MainFrame() ;
 	virtual ~MainFrame()
 	{
 
 	}
 	void SendEventMessage(Message & message);
 	void AddNewChannelPage(std::shared_ptr<Room> room);
+	void RemoveChannelPage(const std::string & roomName);
 protected:
 	void OnClickNewRoom(wxCommandEvent & event) override;
+	
 	wxMessageQueue<std::string> m_msgQueue;
 	Dict<std::string, ChannelPage*> m_roomPages;
+	int m_pageId;
 
 };
 class Application : public wxApp
