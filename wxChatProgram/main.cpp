@@ -65,33 +65,33 @@ public:
 	{
 		m_name = name;
 		m_msgQueue = msgQueue;
-		client = nullptr;
+		m_client = nullptr;
 	}
 	~SendMessageThread()
 	{
-		if (client != nullptr)
+		if (m_client != nullptr)
 		{
 			char ss[] = "{\"type\":\"EXIT\",\"value\":\"\",\"room\":\"\"}\n";
-			client->Write(ss, 38);
-			client->Close();
-			delete client;
+			m_client->Write(ss, 38);
+			m_client->Close();
+			delete m_client;
 		}
 	}
 	bool Init()
 	{
-		if (client != nullptr)
+		if (m_client != nullptr)
 		{
 			return true;
 		}
 		wxIPV4address ipv4addr;
 		ipv4addr.Hostname(SERVER_IP);
 		ipv4addr.Service(2016);
-		client = new wxSocketClient();
+		m_client = new wxSocketClient();
 
-		if (client->Connect(ipv4addr) == false)
+		if (m_client->Connect(ipv4addr) == false)
 		{
-			delete client;
-			client = nullptr;
+			delete m_client;
+			m_client = nullptr;
 			return false;
 		}
 		nlohmann::json object;
@@ -110,7 +110,7 @@ public:
 		long writeSize = 0;
 		while (writeSize != s.length())
 		{
-			writeSize += client->Write(s.c_str() + writeSize, s.length() - writeSize).LastWriteCount();
+			writeSize += m_client->Write(s.c_str() + writeSize, s.length() - writeSize).LastWriteCount();
 		}
 		s.clear();
 		long readByteSize = 0;
@@ -119,13 +119,13 @@ public:
 		bool isEndMsg = false;
 		while (isEndMsg == false)
 		{
-			readByteSize = client->Read(readBytes, 1024).LastReadCount();
+			readByteSize = m_client->Read(readBytes, 1024).LastReadCount();
 			if (readByteSize <= 0)
 			{
 				
-				if (client->Error())
+				if (m_client->Error())
 				{
-					wxSocketError error = client->LastError();
+					wxSocketError error = m_client->LastError();
 					return false;
 				}
 			}
@@ -173,14 +173,21 @@ public:
 			long writeSize = 0;
 			while (writeSize != msg.length())
 			{
-				writeSize += client->Write(msg.c_str() + writeSize, msg.length() - writeSize).LastWriteCount();
+				long lastWriteCount = m_client->Write(msg.c_str() + writeSize, msg.length() - writeSize).LastWriteCount();
+				if (lastWriteCount == 0 && m_client->IsClosed())
+				{
+					m_client->Destroy();
+					m_client = nullptr;
+					return nullptr;
+				}
+				writeSize += lastWriteCount;
 			}
 		}
 		return nullptr;
 	}
 private:
 	std::string m_name;
-	wxSocketClient* client;
+	wxSocketClient* m_client;
 	wxMessageQueue<std::string> * m_msgQueue;
 	std::string m_hash;
 };
@@ -398,6 +405,7 @@ bool Application::OnInit()
 		
 	m_indicator = new wxActivityIndicator(m_mainFrame);
 	m_indicator->Show();
+	m_indicator->CenterOnParent();
 	m_indicator->Start();
 		
 	m_mainFrame->Enable(false);

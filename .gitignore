@@ -1,2 +1,6 @@
 *.tlog
 packages/wxWidgetsTemplate.2.5.3/wxWidgetsTemplate.2.5.3.nupkg
+*.suo
+*.dll
+*.pdb
+*.pdb
